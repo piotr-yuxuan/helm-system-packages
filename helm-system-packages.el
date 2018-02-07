@@ -438,9 +438,11 @@ With prefix argument, insert the output at point."
   "Helm user interface for system packages."
   (interactive)
   ;; "portage" does not have an executable of the same name, hence the optional pair (PACKAGE-MANAGER EXECUTABLE).
-  (let ((managers (seq-filter (lambda (p) (executable-find (car p))) '(("emerge" "portage") ("dpkg") ("pacman")))))
+  (let ((managers (seq-filter (lambda (p) (executable-find (car p))) '(("emerge" "portage") ("dpkg") ("pacman") ("brew")))))
     (if (not managers)
-        (message "No supported package manager was found")
+        (message (if (eq system-type 'darwin)
+		     "No supported package manager was found. Check your `exec-path'."
+		   "No supported package manager was found."))
       (let ((manager (car (last (car managers)))))
         (require (intern (concat "helm-system-packages-" manager)))
         (fset 'helm-system-packages-refresh (intern (concat "helm-system-packages-" manager "-refresh")))
