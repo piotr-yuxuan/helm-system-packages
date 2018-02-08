@@ -142,15 +142,15 @@ Return (NAMES . DESCRIPTIONS), a cons of two strings."
 	      (buffer-string))))
     ;; replace-regexp-in-string is faster than mapconcat over split-string.
     (setq names
-	  (replace-regexp-in-string ":.*" "" descriptions))
-    (let ((d (split-string descriptions "\n")) pkg package-name package-desc (description-string "")  (format-string (format "%%-%ds  %%s" helm-system-packages-column-width)))
-      (while d
-    	(setq pkg (split-string (car d) ": ")
-    	      package-name (car pkg)
-    	      package-desc (cdr pkg))
-    	(setq description-string (concat description-string (format format-string package-name package-desc) "\n"))
-    	(setq d (cdr d))))
-    (cons names descriptions)))
+	  (replace-regexp-in-string ":.*" "" descriptions))      
+    (setq descriptions (mapconcat (lambda (package-from-list)
+				    (let* ((pkg (split-string package-from-list ": "))
+					   (name (car pkg))
+					   (desc (car (cdr pkg)))
+					   (format-string (format "%%-%ds  %%s" helm-system-packages-column-width)))
+				    (format format-string name desc)))
+				  (split-string descriptions"\n") "\n" ))
+  (cons names descriptions)))
 
 
 (defun helm-system-packages-brew-init ()
