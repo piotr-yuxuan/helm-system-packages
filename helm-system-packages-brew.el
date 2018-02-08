@@ -140,9 +140,16 @@ Return (NAMES . DESCRIPTIONS), a cons of two strings."
 	      ;;                   "  <group>\n")))
 	      ;; (sort-lines nil (point-min) (point-max))
 	      (buffer-string))))
-	  ;; replace-regexp-in-string is faster than mapconcat over split-string.
+    ;; replace-regexp-in-string is faster than mapconcat over split-string.
     (setq names
-		(replace-regexp-in-string ":.*" "" descriptions))
+	  (replace-regexp-in-string ":.*" "" descriptions))
+    (let ((d (split-string descriptions "\n")) pkg package-name package-desc (description-string "")  (format-string (format "%%-%ds  %%s" helm-system-packages-column-width)))
+      (while d
+    	(setq pkg (split-string (car d) ": ")
+    	      package-name (car pkg)
+    	      package-desc (cdr pkg))
+    	(setq description-string (concat description-string (format format-string package-name package-desc) "\n"))
+    	(setq d (cdr d))))
     (cons names descriptions)))
 
 
