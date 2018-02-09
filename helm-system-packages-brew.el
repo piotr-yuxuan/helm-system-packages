@@ -320,12 +320,13 @@ COMMAND will be run in an Eshell buffer `helm-system-packages-eshell-buffer'."
     ("Show reverse dependencies" .
      (lambda (_)
        (helm-system-packages-pacman-show-dependencies _ 'reverse)))
-    ("Mark as dependency" .
-     (lambda (_)
-       (helm-system-packages-run-as-root "pacman" "--database" "--asdeps")))
-    ("Mark as explicit" .
-     (lambda (_)
-       (helm-system-packages-run-as-root "pacman" "--database" "--asexplicit"))))
+    ;; ("Mark as dependency" .
+    ;;  (lambda (_)
+    ;;    (helm-system-packages-run-as-root "pacman" "--database" "--asdeps")))
+    ;; ("Mark as explicit" .
+    ;;  (lambda (_)
+    ;;    (helm-system-packages-run-as-root "pacman" "--database" "--asexplicit"))))
+    )
   "Actions for Helm pacman."
   :group 'helm-system-packages
   :type '(alist :key-type string :value-type function))
