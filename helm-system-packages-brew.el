@@ -304,10 +304,10 @@ COMMAND will be run in an Eshell buffer `helm-system-packages-eshell-buffer'."
   '(("Show package(s)" . helm-system-packages-brew-info)
     ("Install (`C-u' to reinstall)" .
      (lambda (_)
-       (helm-system-packages-run-as-root "pacman" "--sync"
-                                         (unless helm-current-prefix-arg "--needed")
-                                         (unless helm-system-packages-pacman-confirm-p "--noconfirm"))))
-    ("Uninstall (`C-u' to include dependencies)" .
+       (if helm-current-prefix-arg
+	   (helm-system-packages-brew-run  "brew" "reinstall")
+	 (helm-system-packages-brew-run "brew" "install"))))
+    ("Uninstall (`C-u' to uninstall all versions)" .
      (lambda (_)
        (helm-system-packages-run-as-root "pacman" "--remove"
                                          (when helm-current-prefix-arg "--recursive")
