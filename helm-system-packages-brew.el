@@ -278,6 +278,28 @@ If REVERSE is non-nil, list reverse dependencies instead."
                (apply 'helm-system-packages-call '("expac" "--query" "--listdelim" "\n" ,format-string) p))))
       (helm-system-packages-categorize (helm-marked-candidates))))))
 
+
+(defun helm-system-packages-brew-run (command &rest args)
+  "COMMAND to run over `helm-marked-candidates'.
+
+COMMAND will be run in an Eshell buffer `helm-system-packages-eshell-buffer'."
+  (require 'esh-mode)
+  (let ((arg-list (append args (helm-marked-candidates)))
+        (eshell-buffer-name helm-system-packages-eshell-buffer))
+    ;; Refresh package list after command has completed.
+    (push command arg-list)
+    (eshell)
+    (if (eshell-interactive-process)
+        (message "A process is already running")
+      (add-hook 'eshell-post-command-hook 'helm-system-packages-refresh nil t)
+      (add-hook 'eshell-post-command-hook
+                (lambda () (remove-hook 'eshell-post-command-hook 'helm-system-packages-refresh t))
+                t t)
+      (goto-char (point-max))
+      (insert (mapconcat 'identity arg-list " "))
+      (when helm-system-packages-auto-send-commandline-p
+        (eshell-send-input)))))
+
 (defcustom helm-system-packages-brew-actions
   '(("Show package(s)" . helm-system-packages-brew-info)
     ("Install (`C-u' to reinstall)" .
