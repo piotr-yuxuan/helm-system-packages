@@ -309,14 +309,14 @@ COMMAND will be run in an Eshell buffer `helm-system-packages-eshell-buffer'."
 	 (helm-system-packages-brew-run "brew" "install"))))
     ("Uninstall (`C-u' to uninstall all versions)" .
      (lambda (_)
-       (helm-system-packages-run-as-root "pacman" "--remove"
-                                         (when helm-current-prefix-arg "--recursive")
-                                         (unless helm-system-packages-pacman-confirm-p "--noconfirm"))))
-    ("Browse homepage URL" .
-     (lambda (_)
-       (helm-system-packages-browse-url (split-string (helm-system-packages-run "expac" "--sync" "%u") "\n" t))))
-    ("Find files" . helm-system-packages-pacman-find-files)
-    ("Show dependencies (`C-u' to include optional deps)" . helm-system-packages-pacman-show-dependencies)
+       (helm-system-packages-brew-run "brew" "uninstall"
+                                         (when helm-current-prefix-arg "--force"))))
+    ;; TODO: Find a way to get the homepage url from 'brew home formula' without opening Safari
+    ;; ("Browse homepage URL" .
+    ;;  (lambda (_)
+    ;;    (helm-system-packages-browse-url (helm-system-packages-run-as-root "brew" "install")))-sync" "%u") "\n" t))))
+    ("Find files" . helm-system-packages-brew-find-files)
+    ("Show dependencies (`C-u' to include optional deps)" . helm-system-packages-brew-show-dependencies)
     ("Show reverse dependencies" .
      (lambda (_)
        (helm-system-packages-pacman-show-dependencies _ 'reverse)))
