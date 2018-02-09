@@ -200,36 +200,37 @@ Return (NAMES . DESCRIPTIONS), a cons of two strings."
   :group 'helm-system-packages
   :type 'boolean)
 
-(defun helm-system-packages-pacman-info (_candidate)
+(defun helm-system-packages-brew-info (_candidate)
   "Print information about the selected packages.
-
-The local database will be queried if possible, while the sync
-database is used as a fallback.  Note that they don't hold the
-exact same information.
 
 With prefix argument, insert the output at point.
 Otherwise display in `helm-system-packages-buffer'."
-  (helm-system-packages-show-information
-   (helm-system-packages-mapalist
-    '((uninstalled (lambda (info-string)
-                     ;; Normalize `pacman -Sii' output.", e.g.
-                     ;;
-                     ;;   Repository      : community
-                     ;;   Name            : FOO
-                     ;;   ...
-                     ;;
-                     ;; to
-                     ;;
-                     ;;   Name            : FOO
-                     ;;   Repository      : community
-                     ;;   ...
-                     (replace-regexp-in-string "\n\n\\(.*\\)\n\\(.*\\)" "\n\n\\2\n\\1"
-                                               (concat "\n\n" info-string))))
-      (all identity))
-    (helm-system-packages-mapalist '((uninstalled (lambda (&rest p) (apply 'helm-system-packages-call '("pacman" "--sync" "--info" "--info") p)))
-                                     (groups ignore)
-                                     (all (lambda (&rest p) (apply 'helm-system-packages-call '("pacman" "--query" "--info" "--info") p))))
-                                   (helm-system-packages-categorize (helm-marked-candidates))))))
+  (let* ((descriptions (json-read-from-string (with-temp-buffer
+						(apply 'call-process "brew" nil t nil "info" "--json=v1" (helm-marked-candidates)) 
+						(buffer-string))))
+	 str)
+    (setq str (mapconcat (lambda (pkg)
+			   (concat ": " (alist-get 'name pkg) "\n"
+				   "Description: " (alist-get 'desc pkg) "\n"
+				   "Version: "(alist-get 'stable (alist-get 'versions pkg)) "\n"
+				   "URL: "(alist-get 'homepage pkg) "\n"  "\n"
+				   "Dependencies:\n" "   " (mapconcat 'identity (alist-get 'optional_dependencies pkg) "\n   ") "\n\n"
+				   "Optional dependencies:\n" "   "(mapconcat 'identity (alist-get 'dependencies pkg) "\n   ") "\n\n"
+				   "Options:\n" (mapconcat (lambda (pkg-option)
+							     (concat (alist-get 'option pkg-option)  "\n"
+								     "    " (alist-get 'description pkg-option)  "\n"))
+							   (alist-get 'options pkg) "\n")
+				   "\n\n"
+				   "Caveats: " (alist-get 'caveats pkg) "\n")
+			   )
+			 descriptions
+			 "\n\n"))
+    (helm-system-packages-show-information `((uninstalled ,str)))
+    )
+  ;;(helm-system-packages-show-information (helm-system-packages-mapalist '((all (lambda (&rest p)
+
+)
+
 
 (defun helm-system-packages-pacman-find-files (_candidate)
   "List candidate files for display in `helm-system-packages-find-files'.
