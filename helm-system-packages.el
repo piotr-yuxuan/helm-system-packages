@@ -30,7 +30,7 @@
 ;; Since package lists can be memory consuming, we use
 ;; `helm-build-in-buffer-source' to make Helm search faster.
 ;;
-;; The core of the machanism evolves around the two buffer caches:
+;; The core of the mechanism evolves around the two buffer caches:
 ;; - the "name" cache with one name per line,
 ;; - the "description" cache with one "name <whitespace> description" per line.
 ;;
@@ -67,6 +67,7 @@
 (defvar helm-system-packages--show-orphans-p t)
 (defvar helm-system-packages--show-locals-p t)
 (defvar helm-system-packages--show-groups-p t)
+(defvar helm-system-packages--show-pinned-p t)
 
 (defvar helm-system-packages--source-name "package source")
 
@@ -106,6 +107,10 @@ This is only used for dependency display.")
 
 (defface helm-system-packages-groups '((t (:inherit font-lock-doc-face)))
   "Face for package groups."
+  :group 'helm-system-packages)
+
+(defface helm-system-packages-pinned '((t (:weight bold)))
+  "Face for pinned packages."
   :group 'helm-system-packages)
 
 (defface helm-system-packages-virtual '((t (:slant italic)))
@@ -162,6 +167,13 @@ This is only used for dependency display.")
     (helm-update)))
 (put 'helm-system-packages-toggle-groups 'helm-only t)
 
+(defun helm-system-packages-toggle-pinned ()
+  (interactive)
+  (with-helm-alive-p
+    (setq helm-system-packages--show-pinned-p (not helm-system-packages--show-pinned-p))
+    (helm-update)))
+(put 'helm-system-packages-toggle-pinned 'helm-only t)
+
 ;; TODO: Don't refresh when eshell-last-command-status is not 0?
 (defvar helm-system-packages-refresh nil
   "Function to refresh the package list.
@@ -212,9 +224,10 @@ the window."
   :type 'boolean)
 
 (defun helm-system-packages-mapalist (fun-alist alist)
-  "Apply the FUN-ALIST function to each element in ALIST with the same key.
+  "Apply each function of FUN-ALIST to the list with the same key in ALIST.
 Return the alist of the results.
 Keys must be symbols.
+
 The special key `all' matches all members in ALIST.
 Only the first match is applied.
 If a member of ALIST does not have a matching function, it is dropped.
@@ -226,9 +239,9 @@ To explicitly keep an element, use the `identity' function."
     (dolist (e alist)
       (let* ((fun (or (car (alist-get (car e) fun-alist))
                       fun-all))
-             (res (and fun (apply fun (cdr e)))))
+             (res (and fun (funcall fun (cdr e)))))
         (when res
-          (push (list (car e) res) result))))
+          (push (cons (car e) res) result))))
     (nreverse result)))
 
 (defun helm-system-packages-categorize (packages)
@@ -238,22 +251,21 @@ Order is presever within categories.
 Categories are infered from `helm-system-packages--display-lists': it's the last
 word of the first associated symbol.
 If not found, category is `uninstalled'."
-  (let ((result '())) ; TODO: Include in dolist.
-    (dolist (p packages)
+  (let ((result '()))
+    (dolist (p packages result)
       (let* ((e (assoc p helm-system-packages--display-lists))
              (category (or (and e (intern (replace-regexp-in-string ".*\\W\\(\\w+\\)$" "\\1" (symbol-name (cadr e)))))
                            'uninstalled))
              (cell (assoc category result)))
         (if cell
             (setcdr cell (nconc (cdr cell) (list p)))
-          (push (list category p) result))))
-    result))
+          (push (list category p) result))))))
 
 (defun helm-system-packages-toggle-descriptions ()
   "Toggle description column."
   (interactive)
   (with-helm-alive-p
-  (setq helm-system-packages-show-descriptions-p (not helm-system-packages-show-descriptions-p))
+    (setq helm-system-packages-show-descriptions-p (not helm-system-packages-show-descriptions-p))
     (helm-force-update)))
 (put 'helm-system-packages-toggle-descriptions 'helm-only t)
 
@@ -271,11 +283,7 @@ such as the package description."
   "Show package information contained in DESC-ALIST.
 DESC-ALIST's keys are ignored, the values are in the form
 
-.*: PACKAGE-NAME
-PACKAGE-INFO...
-
-.*: OTHER-PACKAGE-NAME
-..."
+    ((package-name . package-desc)...)"
   (cond
    ((not desc-alist)
     (message "No information for package(s) %s" (mapconcat 'identity (helm-marked-candidates) " ")))
@@ -285,30 +293,24 @@ PACKAGE-INFO...
    (t (switch-to-buffer helm-system-packages-buffer)
       (view-mode 0)
       (erase-buffer)
-      (insert "\n\n")
-      (mapc 'insert (mapcar 'cadr desc-alist))
-      (goto-char (point-min))
-      (while (re-search-forward "\n\n.*: " nil t)
-        (replace-match "\n* "))
+      (dolist (desc (sort
+                     (apply 'append (mapcar 'cdr desc-alist))
+                     (lambda (a b) (string< (car a) (car b)))))
+        (insert "* " (car desc) "\n" (replace-regexp-in-string "^* " "- " (cdr desc)) "\n"))
       (goto-char (point-min))
       (org-mode)
-      (org-sort-entries nil ?a)
-      (goto-char (point-min))
-      (delete-blank-lines)
       (unless (or helm-current-prefix-arg helm-system-packages-editable-info-p)
         (view-mode 1)))))
 
-;; TODO: If we do not make 'args' a &rest, then `apply' can be removed in the caller.
-(defun helm-system-packages-call (commandline &rest args)
-  "COMMANDLINE to run over ARGS.
-COMMANDLINE is a list where the `car' is the command and the
-`cdr' are the options."
+(defun helm-system-packages-call (command &optional args &rest options)
+  "COMMAND to run with OPTIONS over the ARGS list.
+OPTIONS are insert before ARGS.
+Return the result as a string."
   (with-temp-buffer
     ;; We discard errors.
-    (apply #'call-process (car commandline) nil t nil (append (cdr commandline) args))
+    (apply #'call-process command nil t nil (append options args))
     (buffer-string)))
 
-;; TODO: Replace -run by -call.
 (defun helm-system-packages-run (command &rest args)
   "COMMAND to run over `helm-marked-candidates'."
   (let ((arg-list (append args (helm-marked-candidates))))
@@ -316,8 +318,8 @@ COMMANDLINE is a list where the `car' is the command and the
       ;; We discard errors.
       (apply #'call-process command nil t nil arg-list)
       (buffer-string))))
+(make-obsolete 'helm-system-packages-run 'helm-system-packages-call "1.9.0")
 
-;; TODO: Replace -print by -show-information.
 (defun helm-system-packages-print (command &rest args)
   "COMMAND to run over `helm-marked-candidates'.
 
@@ -337,6 +339,7 @@ Otherwise display in `helm-system-packages-buffer'."
       (save-excursion (insert res))
       (unless (or helm-current-prefix-arg helm-system-packages-editable-info-p)
         (view-mode 1)))))
+(make-obsolete 'helm-system-packages-print 'helm-system-packages-show-information "1.9.0")
 
 (defun helm-system-packages-build-file-source (package files)
   "Build Helm file source for PACKAGE with FILES candidates.
@@ -375,43 +378,60 @@ In case of a hash table, one Helm source per package will be created."
             (helm-system-packages-build-file-source "Package files" files)
             :buffer "*helm system package files*"))))
 
-;; TODO: Replace by -find-files.
 (defun helm-system-packages-files (command &rest args)
   (let ((res (apply #'helm-system-packages-run command args)))
     (if (string= res "")
-        (message "No result") ; TODO: Error in helm-system-packages-run.
+        (message "No result")
       (if helm-current-prefix-arg
           (insert res)
         (helm :sources
               (helm-system-packages-build-file-source "Packages" (split-string res "\n"))
               :buffer "*helm system package files*")))))
+(make-obsolete 'helm-system-packages-files 'helm-system-packages-find-files "1.9.0")
+
+(defun helm-system-packages-call-as-root (command args packages)
+  "Call COMMAND ARGS PACKAGES as root.
+ARGS and PACKAGES must be lists.
+COMMAND will be run in the Eshell buffer `helm-system-packages-eshell-buffer'."
+  (require 'esh-mode)
+  (if (not packages)
+      (message "No suitable package selected")
+    (let ((arg-list (append args packages))
+          (eshell-buffer-name helm-system-packages-eshell-buffer))
+      ;; Refresh package list after command has completed.
+      (eshell)
+      (if (eshell-interactive-process)
+          (message "A process is already running")
+        (push command arg-list)
+        (push "sudo" arg-list)
+        (add-hook 'eshell-post-command-hook 'helm-system-packages-refresh nil t)
+        (add-hook 'eshell-post-command-hook
+                  (lambda () (remove-hook 'eshell-post-command-hook 'helm-system-packages-refresh t))
+                  t t)
+        (goto-char (point-max))
+        (insert (mapconcat 'identity arg-list " "))
+        (when helm-system-packages-auto-send-commandline-p
+          (eshell-send-input))))))
 
 (defun helm-system-packages-run-as-root (command &rest args)
   "COMMAND to run over `helm-marked-candidates'.
+COMMAND will be run in the Eshell buffer `helm-system-packages-eshell-buffer'."
+  (helm-system-packages-call-as-root command args (helm-marked-candidates)))
 
-COMMAND will be run in an Eshell buffer `helm-system-packages-eshell-buffer'."
-  (require 'esh-mode)
-  (let ((arg-list (append args (helm-marked-candidates)))
-        (eshell-buffer-name helm-system-packages-eshell-buffer))
-    ;; Refresh package list after command has completed.
-    (push command arg-list)
-    (push "sudo" arg-list)
-    (eshell)
-    (if (eshell-interactive-process)
-        (message "A process is already running")
-      (add-hook 'eshell-post-command-hook 'helm-system-packages-refresh nil t)
-      (add-hook 'eshell-post-command-hook
-                (lambda () (remove-hook 'eshell-post-command-hook 'helm-system-packages-refresh t))
-                t t)
-      (goto-char (point-max))
-      (insert (mapconcat 'identity arg-list " "))
-      (when helm-system-packages-auto-send-commandline-p
-        (eshell-send-input)))))
+(defun helm-system-packages-run-as-root-over-installed (command &rest args)
+  "COMMAND to run over installed packages among `helm-marked-candidates'.
+COMMAND will be run in the Eshell buffer `helm-system-packages-eshell-buffer'."
+  (helm-system-packages-call-as-root
+   command
+   args
+   (seq-filter (lambda (p) (assoc p helm-system-packages--display-lists))
+               (helm-marked-candidates))))
 
 (defun helm-system-packages-show-packages (package-alist)
   "Run a Helm session over the packages in PACKAGE-ALIST.
-The key of the alist is ignore and the package lists are considered as one
-single list.  This may change in the future."
+The key of the alist is ignored and the package lists are considered as one
+single list.  This may change in the future.
+The value is a string buffer, like the cache."
   (setq helm-system-packages--descriptions
         (or helm-system-packages--descriptions-global
             helm-system-packages--descriptions))
@@ -428,31 +448,28 @@ single list.  This may change in the future."
     ;; TODO: Possible optimization: split-string + sort + del-dups + mapconcat instead of working on buffer.
     (let (desc-res
           (buf (with-temp-buffer
-                 (mapc 'insert (mapcar 'cadr package-alist))
+                 (mapc 'insert (mapcar 'cdr package-alist))
                  (sort-lines nil (point-min) (point-max))
                  (delete-duplicate-lines (point-min) (point-max))
                  (buffer-string))))
-         (dolist (name (split-string buf "\n" t))
-           (if (string-match (concat "^" name "  .*$") helm-system-packages--descriptions)
-               (setq desc-res (concat desc-res (match-string 0 helm-system-packages--descriptions) "\n"))
-             (push name helm-system-packages--virtual-list)
-             (setq desc-res (concat desc-res
-                                    name
-                                    (make-string (- helm-system-packages-column-width (length name)) ? )
-                                    "  <virtual package>"
-                                    "\n"))))
-         (let ((helm-system-packages--descriptions desc-res)
-               (helm-system-packages--names buf))
-           (helm-system-packages)))))
+      (dolist (name (split-string buf "\n" t))
+        (if (string-match (concat "^" name "  .*$") helm-system-packages--descriptions)
+            (setq desc-res (concat desc-res (match-string 0 helm-system-packages--descriptions) "\n"))
+          (push name helm-system-packages--virtual-list)
+          (setq desc-res (concat desc-res
+                                 name
+                                 (make-string (- helm-system-packages-column-width (length name)) ? )
+                                 "  <virtual package>"
+                                 "\n"))))
+      (let ((helm-system-packages--descriptions desc-res)
+            (helm-system-packages--names buf))
+        (helm-system-packages)))))
 
 (defun helm-system-packages-browse-url (urls)
-  "Browse homepage URLs of `helm-marked-candidates'.
-
-With prefix argument, insert the output at point."
-  (cond
-   ((not urls) (message "No result"))
-   (helm-current-prefix-arg (insert urls))
-   (t (mapc 'browse-url (helm-comp-read "URL: " urls :must-match t :exec-when-only-one t :marked-candidates t)))))
+  "Browse homepage URLs of `helm-marked-candidates'."
+  (if (not urls)
+      (message "No result")
+    (mapc 'browse-url (helm-comp-read "URL: " urls :must-match t :exec-when-only-one t :marked-candidates t))))
 
 (defun helm-system-packages-missing-dependencies-p (&rest deps)
   "Return non-nil if some DEPS are missing."
@@ -467,8 +484,10 @@ With prefix argument, insert the output at point."
 (defun helm-system-packages ()
   "Helm user interface for system packages."
   (interactive)
-  ;; "portage" does not have an executable of the same name, hence the optional pair (PACKAGE-MANAGER EXECUTABLE).
-  (let ((managers (seq-filter (lambda (p) (executable-find (car p))) '(("emerge" "portage") ("dpkg") ("pacman") ("brew")))))
+  ;; Some package managgers do not have an executable bearing the same name,
+  ;; hence the optional pair (PACKAGE-MANAGER EXECUTABLE).
+  (let ((managers (seq-filter (lambda (p) (executable-find (car p)))
+                              '(("emerge" "portage") ("dpkg") ("pacman") ("xbps-query" "xbps") ("brew")))))
     (if (not managers)
         (message (if (eq system-type 'darwin)
 		     "No supported package manager was found. Check your `exec-path'."
