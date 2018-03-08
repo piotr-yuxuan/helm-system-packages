@@ -27,6 +27,7 @@
 
 ;;; Code:
 (require 'helm)
+(require 'json)
 (require 'helm-system-packages)
 
 (defvar helm-system-packages-brew-help-message
@@ -208,29 +209,27 @@ Otherwise display in `helm-system-packages-buffer'."
   (let* ((descriptions (json-read-from-string (with-temp-buffer
 						(apply 'call-process "brew" nil t nil "info" "--json=v1" (helm-marked-candidates)) 
 						(buffer-string))))
-	 str)
-    (setq str (mapconcat (lambda (pkg)
-			   (concat ": " (alist-get 'name pkg) "\n"
-				   "Description: " (alist-get 'desc pkg) "\n"
-				   "Version: "(alist-get 'stable (alist-get 'versions pkg)) "\n"
-				   "URL: "(alist-get 'homepage pkg) "\n"  "\n"
-				   "Dependencies:\n" "   " (mapconcat 'identity (alist-get 'optional_dependencies pkg) "\n   ") "\n\n"
-				   "Optional dependencies:\n" "   "(mapconcat 'identity (alist-get 'dependencies pkg) "\n   ") "\n\n"
-				   "Options:\n" (mapconcat (lambda (pkg-option)
-							     (concat (alist-get 'option pkg-option)  "\n"
-								     "    " (alist-get 'description pkg-option)  "\n"))
-							   (alist-get 'options pkg) "\n")
-				   "\n\n"
-				   "Caveats: " (alist-get 'caveats pkg) "\n")
-			   )
-			 descriptions
-			 "\n\n"))
-    (helm-system-packages-show-information `((uninstalled ,str)))
-    )
-  ;;(helm-system-packages-show-information (helm-system-packages-mapalist '((all (lambda (&rest p)
-
-)
-
+	 desc-list
+	 pkg-desc-alist
+	 str
+	 pkg
+	 (i 0))
+    (dolist (pkg (helm-marked-candidates) nil)
+      (setq pkg-desc-alist (aref descriptions i))
+      (setq str (concat "* Description: " (alist-get 'desc pkg-desc-alist) "\n"
+	      "* Version: "(alist-get 'stable (alist-get 'versions pkg-desc-alist)) "\n"
+	      "* URL: "(alist-get 'homepage pkg-desc-alist) "\n"  "\n"
+	      "* Dependencies:\n" "   " (mapconcat 'identity (alist-get 'dependencies pkg-desc-alist) "\n   ") "\n\n"
+	      "* Optional dependencies:\n" "   "(mapconcat 'identity (alist-get 'optional_dependencies pkg-desc-alist) "\n   ") "\n\n"
+	      "* Options:\n" (mapconcat (lambda (pkg-option)
+					(concat (alist-get 'option pkg-option)  "\n"
+						"    " (alist-get 'description pkg-option)  "\n"))
+				      (alist-get 'options pkg-desc-alist) "\n")
+	      "\n\n"
+	      "* Caveats: " (alist-get 'caveats pkg-desc-alist) "\n"))
+     (add-to-list 'desc-list `(uninstalled (,pkg . ,str)))
+     (setq i (+ i 1)))
+    (helm-system-packages-show-information desc-list)))
 
 (defun helm-system-packages-pacman-find-files (_candidate)
   "List candidate files for display in `helm-system-packages-find-files'.
