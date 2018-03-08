@@ -231,6 +231,14 @@ Otherwise display in `helm-system-packages-buffer'."
      (setq i (+ i 1)))
     (helm-system-packages-show-information desc-list)))
 
+(defun helm-system-package-brew-browse-url (_candidate)
+   (let* ((descriptions (json-read-from-string (with-temp-buffer
+						(apply 'call-process "brew" nil t nil "info" "--json=v1" (helm-marked-candidates)) 
+						(buffer-string)))))
+    (helm-system-packages-browse-url (mapcar (lambda(pkg)
+					       (alist-get 'homepage pkg))
+					     descriptions))))
+
 (defun helm-system-packages-pacman-find-files (_candidate)
   "List candidate files for display in `helm-system-packages-find-files'.
 
@@ -311,10 +319,8 @@ COMMAND will be run in an Eshell buffer `helm-system-packages-eshell-buffer'."
      (lambda (_)
        (helm-system-packages-brew-run "brew" "uninstall"
                                          (when helm-current-prefix-arg "--force"))))
-    ;; TODO: Find a way to get the homepage url from 'brew home formula' without opening Safari
-    ;; ("Browse homepage URL" .
-    ;;  (lambda (_)
-    ;;    (helm-system-packages-browse-url (helm-system-packages-run-as-root "brew" "install")))-sync" "%u") "\n" t))))
+    
+    ("Browse homepage URL" . helm-system-package-brew-browse-url)
     ("Find files" . helm-system-packages-brew-find-files)
     ("Show dependencies (`C-u' to include optional deps)" . helm-system-packages-brew-show-dependencies)
     ("Show reverse dependencies" .
