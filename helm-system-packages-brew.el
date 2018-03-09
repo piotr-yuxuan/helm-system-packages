@@ -30,32 +30,6 @@
 (require 'json)
 (require 'helm-system-packages)
 
-(defvar helm-system-packages-brew-help-message
-  "* Helm Brew
-
-** Commands
-\\<helm-system-packages-homebrew-map>
-\\[helm-system-packages-pacman-toggle-explicit]\t\tToggle display of explicitly installed packages.
-\\[helm-system-packages-pacman-toggle-uninstalled]\t\tToggle display of non-installed.
-\\[helm-system-packages-pacman-toggle-dependencies]\t\tToggle display of required dependencies.
-\\[helm-system-packages-pacman-toggle-orphans]\t\tToggle display of unrequired dependencies.
-\\[helm-system-packages-pacman-toggle-locals]\t\tToggle display of local packages.
-\\[helm-system-packages-pacman-toggle-groups]\t\tToggle display of package groups.
-\\[helm-system-packages-toggle-descriptions]\t\tToggle display of package descriptions.")
-
-(defvar helm-system-packages-brew-map
-  ;; M-U is reserved for `helm-unmark-all'.
-  (let ((map (make-sparse-keymap)))
-    (set-keymap-parent map helm-map)
-    (define-key map (kbd "M-I")   'helm-system-packages-toggle-explicit)
-    (define-key map (kbd "M-N")   'helm-system-packages-toggle-uninstalled)
-    (define-key map (kbd "M-D")   'helm-system-packages-toggle-dependencies)
-    (define-key map (kbd "M-O")   'helm-system-packages-toggle-orphans)
-    (define-key map (kbd "M-L")   'helm-system-packages-toggle-locals)
-    (define-key map (kbd "M-G")   'helm-system-packages-toggle-groups)
-    (define-key map (kbd "C-]")   'helm-system-packages-toggle-descriptions)
-    map))
-
 ;; TODO: Propertize the cache directly?
 (defun helm-system-packages-brew-transformer (packages)
   ;; TODO: Possible optimization: Get rid of `reverse'.
