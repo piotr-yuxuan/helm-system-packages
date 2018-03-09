@@ -111,7 +111,6 @@ We probably still need specific "info" actions to insert at point.
 *** With filtering, the displayed condidates won't include those above the candidate limit
 Can we include as many filtered candidates as possible?
 *** Add guix support
-*** Add homebrew support
 
 * References
 - https://wiki.voidlinux.eu/Rosetta_stone
