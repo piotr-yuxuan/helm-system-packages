@@ -25,6 +25,12 @@
 ;;; Commentary:
 ;; Helm UI for Mac OS' homebrew.
 
+;; TODO
+;; (1) Implement `show-dependencies' function
+;; (2) Show packages explicitly installed (function `helm-system-packages-brew-list-explicit' already exists)
+;; (3) Implement `find-files'
+;; (4) Keymap
+
 ;;; Code:
 (require 'helm)
 (require 'json)
