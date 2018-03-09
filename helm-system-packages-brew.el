@@ -137,6 +137,14 @@ Otherwise display in `helm-system-packages-buffer'."
 					       (alist-get 'homepage pkg))
 					     descriptions))))
 
+(defun helm-system-package-brew-link-app (_candidate)
+  (helm-system-packages-brew-run  "brew" "link"))
+
+(defun helm-system-package-brew-unlink-app (_candidate)
+  (helm-system-packages-brew-run  "brew" "unlink"))
+
+
+
 (defun helm-system-packages-brew-run (command &rest args)
   "COMMAND to run over `helm-marked-candidates'.
 
@@ -170,7 +178,9 @@ COMMAND will be run in an Eshell buffer `helm-system-packages-eshell-buffer'."
        (helm-system-packages-brew-run "brew" "uninstall"
                                          (when helm-current-prefix-arg "--force"))))
     
-    ("Browse homepage URL" . helm-system-package-brew-browse-url) )
+    ("Browse homepage URL" . helm-system-package-brew-browse-url)
+    ("Link application" . helm-system-package-brew-link-app)
+    ("Unlink application" . helm-system-package-brew-unlink-app))
   "Actions for Helm brew."
   :group 'helm-system-packages
   :type '(alist :key-type string :value-type function))
