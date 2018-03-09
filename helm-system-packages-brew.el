@@ -38,38 +38,10 @@
          ((and (not face) helm-system-packages--show-uninstalled-p)
                (push p res)))))))
 
-;; TODO: Possible optimization: Split buffer directly.
 (defun helm-system-packages-brew-list-explicit ()
   "List explicitly installed packages."
   (split-string (with-temp-buffer
                   (call-process "brew" nil t nil "list")
-                  (buffer-string))))
-
-(defun helm-system-packages-pacman-list-dependencies ()
-  "List packages installed as a required dependency."
-  (split-string (with-temp-buffer
-                  (call-process "brew" nil t nil "deps" "installed")
-                  (buffer-string))))
-
-(defun helm-system-packages-pacman-list-orphans ()
-  "List orphan packages (unrequired dependencies)."
-  (split-string (with-temp-buffer
-                  (call-process "pacman" nil t nil "--query" "--deps" "--unrequired" "--quiet")
-                  (buffer-string))))
-
-(defun helm-system-packages-pacman-list-locals ()
-  "List explicitly installed local packages.
-Local packages can also be orphans, explicit or dependencies."
-  (split-string (with-temp-buffer
-                  (call-process "pacman" nil t nil "--query" "--foreign" "--quiet")
-                  (buffer-string))))
-
-(defun helm-system-packages-pacman-list-groups ()
-  "List groups.
-Groups can be (un)installed.  Dependency queries list the
-packages belonging to the group."
-  (split-string (with-temp-buffer
-                  (call-process "pacman" nil t nil "--sync" "--groups")
                   (buffer-string))))
 
 (defcustom helm-system-packages-brew-column-width 40
@@ -109,7 +81,6 @@ Return (NAMES . DESCRIPTIONS), a cons of two strings."
 				  (split-string descriptions"\n") "\n" ))
   (cons names descriptions)))
 
-
 (defun helm-system-packages-brew-init ()
   "Cache package lists and create Helm buffer."
   (unless (and helm-system-packages--names helm-system-packages--descriptions)
@@ -130,32 +101,10 @@ Return (NAMES . DESCRIPTIONS), a cons of two strings."
   (setq helm-system-packages-column-width
         (or helm-system-packages-brew-column-width
             helm-system-packages-column-width))
-  (let ()
-      ;; ((explicit (helm-system-packages-pacman-list-explicit))
-        ;; (dependencies (helm-system-packages-pacman-list-dependencies))
-        ;; (orphans (helm-system-packages-pacman-list-orphans))
-        ;; (locals (helm-system-packages-pacman-list-locals))
-        ;; (groups (helm-system-packages-pacman-list-groups)))
     (let ((res (helm-system-packages-brew-cache)))
       (setq helm-system-packages--names (car res)
             helm-system-packages--descriptions (cdr res)))
-    (setq helm-system-packages--display-lists nil)
-    ;; (dolist (p explicit)
-    ;;   (push (cons p '(helm-system-packages-explicit)) helm-system-packages--display-lists))
-    ;; (dolist (p dependencies)
-    ;;   (push (cons p '(helm-system-packages-dependencies)) helm-system-packages--display-lists))
-    ;; (dolist (p orphans)
-    ;;   (push (cons p '(helm-system-packages-orphans)) helm-system-packages--display-lists))
-    ;; (dolist (p locals)
-    ;;   ;; Local packages are necessarily either explicitly installed or a required dependency or an orphan.
-    ;;   (push 'helm-system-packages-locals (cdr (assoc p helm-system-packages--display-lists))))
-    ;; (dolist (p groups)
-    ;;   (push (cons p '(helm-system-pacman-groups)) helm-system-packages--display-lists))))
-    ))
-(defcustom helm-system-packages-pacman-confirm-p t
-  "Prompt for confirmation before proceeding with transaction."
-  :group 'helm-system-packages
-  :type 'boolean)
+    (setq helm-system-packages--display-lists nil))
 
 (defun helm-system-packages-brew-info (_candidate)
   "Print information about the selected packages.
@@ -195,54 +144,6 @@ Otherwise display in `helm-system-packages-buffer'."
 					       (alist-get 'homepage pkg))
 					     descriptions))))
 
-(defun helm-system-packages-pacman-find-files (_candidate)
-  "List candidate files for display in `helm-system-packages-find-files'.
-
-The local database will be queried if possible, while the sync
-database is used as a fallback.  Note that they don't hold the
-exact same information."
-  ;; TODO: Check for errors when file database does not exist.
-  (let ((file-hash (make-hash-table :test 'equal)))
-    (dolist (file-string
-             (mapcar 'cadr
-                     (helm-system-packages-mapalist
-                      '((uninstalled (lambda (&rest p)
-                                       ;; Prepend the missing leading '/' to pacman's file database queries.'
-                                       (replace-regexp-in-string
-                                        "\\([^ ]+ \\)" "\\1/"
-                                        (apply 'helm-system-packages-call '("pacman" "--files" "--list") p))))
-                        (groups ignore)
-                        (all (lambda (&rest p)
-                               (apply 'helm-system-packages-call '("pacman" "--query" "--list") p))))
-                      (helm-system-packages-categorize (helm-marked-candidates)))))
-      ;; The first word of the line (package name) is the hash table key,
-      ;; the rest is pushed to the value (list of files).
-      (string-match "" file-string) ;; Reset search indexes.
-      (while (string-match "\n?\\([^ ]+\\) \\(.*\\)" file-string (match-end 0))
-        (push (match-string 2 file-string) (gethash (match-string 1 file-string) file-hash))))
-    (helm-system-packages-find-files file-hash)))
-
-(defun helm-system-packages-pacman-show-dependencies (_candidate &optional reverse)
-  "List candidate dependencies for `helm-system-packages-show-packages'.
-If REVERSE is non-nil, list reverse dependencies instead."
-  (let ((format-string (if reverse "%N" (concat "%E" (and helm-current-prefix-arg "%o"))))
-        (helm-system-packages--source-name (concat
-                                            (if reverse "Reverse dependencies" "Dependencies")
-                                            " of "
-                                            (mapconcat 'identity (helm-marked-candidates) " "))))
-    (helm-system-packages-show-packages
-     (helm-system-packages-mapalist
-      `((uninstalled (lambda (&rest p)
-                       (apply 'helm-system-packages-call '("expac" "--sync" "--listdelim" "\n" ,format-string) p)))
-        (groups ,(if reverse 'ignore
-                   (lambda (&rest p)
-                     ;; Warning: "--group" seems to be different from "-g".
-                     (apply 'helm-system-packages-call '("expac" "--sync" "-g" "%n") p))))
-        (all (lambda (&rest p)
-               (apply 'helm-system-packages-call '("expac" "--query" "--listdelim" "\n" ,format-string) p))))
-      (helm-system-packages-categorize (helm-marked-candidates))))))
-
-
 (defun helm-system-packages-brew-run (command &rest args)
   "COMMAND to run over `helm-marked-candidates'.
 
@@ -276,20 +177,8 @@ COMMAND will be run in an Eshell buffer `helm-system-packages-eshell-buffer'."
        (helm-system-packages-brew-run "brew" "uninstall"
                                          (when helm-current-prefix-arg "--force"))))
     
-    ("Browse homepage URL" . helm-system-package-brew-browse-url)
-    ("Find files" . helm-system-packages-brew-find-files)
-    ("Show dependencies (`C-u' to include optional deps)" . helm-system-packages-brew-show-dependencies)
-    ("Show reverse dependencies" .
-     (lambda (_)
-       (helm-system-packages-pacman-show-dependencies _ 'reverse)))
-    ;; ("Mark as dependency" .
-    ;;  (lambda (_)
-    ;;    (helm-system-packages-run-as-root "pacman" "--database" "--asdeps")))
-    ;; ("Mark as explicit" .
-    ;;  (lambda (_)
-    ;;    (helm-system-packages-run-as-root "pacman" "--database" "--asexplicit"))))
-    )
-  "Actions for Helm pacman."
+    ("Browse homepage URL" . helm-system-package-brew-browse-url) )
+  "Actions for Helm brew."
   :group 'helm-system-packages
   :type '(alist :key-type string :value-type function))
 
