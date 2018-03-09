@@ -30,31 +30,13 @@
 (require 'json)
 (require 'helm-system-packages)
 
-;; TODO: Propertize the cache directly?
 (defun helm-system-packages-brew-transformer (packages)
-  ;; TODO: Possible optimization: Get rid of `reverse'.
   (let (res (pkglist (reverse packages)))
     (dolist (p pkglist res)
       (let ((face (cdr (assoc (helm-system-packages-extract-name p) helm-system-packages--display-lists))))
         (cond
-         ;; ((and (not face) (member (helm-system-packages-extract-name p) helm-system-packages--virtual-list))
-          ;; When displaying dependencies, package may be virtual.
-          ;; Check first since it is also an "uninstalled" package.
-          ;; (push (propertize p 'face 'helm-system-packages-pacman-virtual) res))
          ((and (not face) helm-system-packages--show-uninstalled-p)
-               (push p res))
-         ;; For filtering, we consider local packages and non-local packages
-         ;; separately, thus we need to treat local packages first.
-         ;; TODO: Add support for multiple faces.
-         ;; ((memq 'helm-system-packages-locals face)
-	 ;; (when helm-system-packages--show-locals-p (push (propertize p 'face (car face)) res)))
-         ;; ((or
-         ;;   (and helm-system-packages--show-explicit-p (memq 'helm-system-packages-explicit face))
-         ;;   (and helm-system-packages--show-dependencies-p (memq 'helm-system-packages-dependencies face))
-         ;;   (and helm-system-packages--show-orphans-p (memq 'helm-system-packages-orphans face))
-         ;;   (and helm-system-packages--show-groups-p (memq 'helm-system-packages-groups face)))
-         ;;  (push (propertize p 'face (car face)) res))
-	 )))))
+               (push p res)))))))
 
 ;; TODO: Possible optimization: Split buffer directly.
 (defun helm-system-packages-brew-list-explicit ()
