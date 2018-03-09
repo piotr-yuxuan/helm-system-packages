@@ -62,14 +62,7 @@ Return (NAMES . DESCRIPTIONS), a cons of two strings."
             ;; TODO: Possible optimization: Output directly in Elisp?
             (let ((format-string (format "%%-%dn  %%d" helm-system-packages-column-width)))
               (call-process "brew" nil '(t nil) nil "desc" "-s" "" )
-              ;; (apply 'call-process "expac" nil '(t nil) nil "--query" format-string local-packages))
-	      ;; (dolist (g groups)
-	      ;;   (insert (concat g
-	      ;;                   (make-string (- helm-system-packages-column-width (length g)) ? )
-	      ;;                   "  <group>\n")))
-	      ;; (sort-lines nil (point-min) (point-max))
 	      (buffer-string))))
-    ;; replace-regexp-in-string is faster than mapconcat over split-string.
     (setq names
 	  (replace-regexp-in-string ":.*" "" descriptions))      
     (setq descriptions (mapconcat (lambda (package-from-list)
@@ -189,8 +182,6 @@ COMMAND will be run in an Eshell buffer `helm-system-packages-eshell-buffer'."
     :candidate-transformer 'helm-system-packages-brew-transformer
     :candidate-number-limit helm-system-packages-candidate-limit
     :display-to-real 'helm-system-packages-extract-name
-    :keymap helm-system-packages-brew-map
-    :help-message 'helm-system-packages-brew-help-message
     :persistent-help "Show package description"
     :action helm-system-packages-brew-actions))
 
